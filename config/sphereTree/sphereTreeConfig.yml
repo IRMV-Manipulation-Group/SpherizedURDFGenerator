@@ -1,0 +1,55 @@
+# 0: grid 1: hubbard 2: medial 3: octree 4: spawn; default: 2
+Method: 2
+
+Grid:
+  TesterLevers: 2
+  Branch: 8
+  Depth: 1
+  NumCoverPts: 10000
+  MinCoverPts: 5
+  Verify: false
+  Nopause: false
+  Eval: false
+
+Hubbard:
+  Branch: 8
+  Depth: 1
+  NumSamples: 500
+  MinSamples: 1
+  Verify: false
+  Nopause: true
+
+Medial:
+  TesterLevers: 2
+  Branch: 8
+  Depth: 1
+  NumCoverPts: 20000
+  MinCoverPts: 5
+  InitSpheres: 1000
+  ErFact: 2
+  SpheresPerNode: 500
+  Verify: false
+  Nopause: true
+  Eval: false
+  UseMerge: true
+  UseBurst: false
+  UseExpand: true
+  Optimise: 0
+  BalExcess: 0.0
+  MaxOptLevel: 0
+
+Octree:
+  Depth: 1
+  Verify: false
+  Nopause: false
+  Eval: false
+
+Spawn:
+  TesterLevers: 2
+  Branch: 8
+  Depth: 1
+  NumCoverPts: 5000
+  MinCoverPts: 5
+  Verify: false
+  Nopause: false
+  Eval: false

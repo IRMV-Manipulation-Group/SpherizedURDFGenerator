@@ -52,7 +52,7 @@ sudo apt-get install libcgal-dev liburdfdom-dev libyaml-cpp-dev libtinyxml2-dev 
 The distribution also contains the following sources from other people (all are introduced in a header-only manner):
 
 - [libigl](https://github.com/libigl/libigl)
-- [sphere_tree](https://github.com/mlund/spheretree)
+- [sphere_tree](https://github.com/mlund/spheretree)  `git submodule update --init --recursive`
 - [ManifoldPlus](https://github.com/hjwdzh/ManifoldPlus)
 - [cmake-template](https://github.com/cpp-best-practices/cmake_template/tree/main)
 

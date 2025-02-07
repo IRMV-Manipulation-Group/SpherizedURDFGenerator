@@ -45,9 +45,8 @@
 
 #include "sphereTreeWrapper/sphereTreeSpawn.h"
 #include "yaml-cpp/yaml.h"
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
 #include "Surface/Surface.h"
-#include "Surface/OBJLoader.h"
 #include "API/MSGrid.h"
 #include "API/SEConvex.h"
 #include "API/SESphPt.h"
@@ -89,84 +88,76 @@ namespace SphereTreeMethod {
                 SphereTreeMethodSpawnName, config_path);
     }
 
-    bot_common::ErrorInfo SphereTreeMethodSpawn::constructTree(const std::string &file, MySphereTree &tree) {
-        if (file.size() > 4 && file.substr(file.size() - 4) == ".obj") {
-            Surface sur;
-            bool loaded = loadOBJ(&sur, file.c_str());
-            if (!loaded) {
-                return {bot_common::ErrorCode::Error, file + " cannot be loaded"};
-            }
-            /*
+    bot_common::ErrorInfo SphereTreeMethodSpawn::constructTree(Surface &sur, MySphereTree &tree) {
+        /*
                 scale box
             */
-            float boxScale = sur.fitIntoBox(1000);
+        float boxScale = sur.fitIntoBox(1000);
 
-            /*
-                make medial tester
-            */
-            MedialTester mt;
-            mt.setSurface(sur);
-            mt.useLargeCover = true;
+        /*
+            make medial tester
+        */
+        MedialTester mt;
+        mt.setSurface(sur);
+        mt.useLargeCover = true;
 
-            /*
-                setup evaluator
-            */
-            SEConvex convEval;
-            convEval.setTester(mt);
-            SEBase *eval_ = &convEval;
+        /*
+            setup evaluator
+        */
+        SEConvex convEval;
+        convEval.setTester(mt);
+        SEBase *eval_ = &convEval;
 
-            Array<Point3D> sphPts;
-            SESphPt sphEval;
-            if (testerLevels > 0){   //  <= 0 will use convex tester
-                SSIsohedron::generateSamples(&sphPts, testerLevels-1);
-                sphEval.setup(mt, sphPts);
-                eval_ = &sphEval;
-                PLOGI << "Using concave tester " << sphPts.getSize();
-            }
+        Array<Point3D> sphPts;
+        SESphPt sphEval;
+        if (testerLevels > 0) {   //  <= 0 will use convex tester
+            SSIsohedron::generateSamples(&sphPts, testerLevels - 1);
+            sphEval.setup(mt, sphPts);
+            eval_ = &sphEval;
+            PLOGI << "Using concave tester " << sphPts.getSize();
+        }
 
-            /*
-                verify model
-            */
-            if (verify && !verifyModel(sur)) {
-                return {bot_common::ErrorCode::Error, "model is not usable"};
-            }
+        /*
+            verify model
+        */
+        if (verify && !verifyModel(sur)) {
+            return {bot_common::ErrorCode::Error, "model is not usable"};
+        }
 
-            /*
-                setup for the set of cover points
-            */
-            Array<Surface::Point> coverPts;
-            MSGrid::generateSamples(&coverPts, numCoverPts, sur, TRUE, minCoverPts);
-            PLOGD<< coverPts.getSize() << "cover points";
+        /*
+            setup for the set of cover points
+        */
+        Array<Surface::Point> coverPts;
+        MSGrid::generateSamples(&coverPts, numCoverPts, sur, TRUE, minCoverPts);
+        PLOGD << coverPts.getSize() << "cover points";
 
-            /*
-                setup SPAWN algorithm
-            */
-            SRSpawn spawn;
-            spawn.setup(mt);
-            spawn.useIterativeSelect = false;
-            spawn.eval = eval_;
+        /*
+            setup SPAWN algorithm
+        */
+        SRSpawn spawn;
+        spawn.setup(mt);
+        spawn.useIterativeSelect = false;
+        spawn.eval = eval_;
 
-            /*
-                setup SphereTree constructor - using dynamic construction
-            */
-            STGGeneric treegen;
-            treegen.eval = eval_;
-            treegen.useRefit = true;
-            treegen.setSamples(coverPts);
-            treegen.reducer = &spawn;
+        /*
+            setup SphereTree constructor - using dynamic construction
+        */
+        STGGeneric treegen;
+        treegen.eval = eval_;
+        treegen.useRefit = true;
+        treegen.setSamples(coverPts);
+        treegen.reducer = &spawn;
 
-            /*
-                make sphere-tree
-            */
-            SphereTree m_tree;
-            m_tree.setupTree(branch, depth+1);
+        /*
+            make sphere-tree
+        */
+        SphereTree m_tree;
+        m_tree.setupTree(branch, depth + 1);
 
-            treegen.constructTree(&m_tree);
+        treegen.constructTree(&m_tree);
 
-            //do scale
-            tree.setBySphereTree(m_tree, 1.0 / boxScale);
-            return bot_common::ErrorInfo::OK();
-        } else
-            return {bot_common::ErrorCode::Error, file + "is invalid file. Only OBJ file is supported"};
+        //do scale
+        tree.setBySphereTree(m_tree, 1.0 / boxScale);
+        return bot_common::ErrorInfo::OK();
     }
 }

@@ -54,117 +54,178 @@
 #include <vector>
 #include <string>
 #include <igl/decimate.h>
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
+#include "ManifoldPlus/Manifold.h"
+#include <future>
+#include <igl/volume.h>
 
-SphereTreeURDFGenerator::SphereTreeURDFGenerator(const std::string &st_config_path, bool single_sphere, bool simplify) {
+SphereTreeURDFGenerator::SphereTreeURDFGenerator(const std::string &st_config_path, bool simplify) {
     YAML::Node doc = YAML::LoadFile(st_config_path);
-    auto type = static_cast<SphereTreeMethod::STMethodType>(doc["Method"].as<int>());
-    switch (type) {
-        case SphereTreeMethod::Grid:
-            m_method = SphereTreeMethod::SphereTreeMethodGrid::create(st_config_path);
-        case SphereTreeMethod::Hubbard:
-            m_method = SphereTreeMethod::SphereTreeMethodHubbard::create(st_config_path);
-        case SphereTreeMethod::Medial:
-            m_method = SphereTreeMethod::SphereTreeMethodMedial::create(st_config_path);
-        case SphereTreeMethod::Octree:
-            m_method = SphereTreeMethod::SphereTreeMethodOctree::create(st_config_path);
-        case SphereTreeMethod::Spawn:
-            m_method = SphereTreeMethod::SphereTreeMethodSpawn::create(st_config_path);
-        default:
-            m_method = SphereTreeMethod::SphereTreeMethodMedial::create(st_config_path);
-    }
+    config_path_ = st_config_path;
+    type_ = static_cast<SphereTreeMethod::STMethodType>(doc["Method"].as<int>());
     doSimplify = simplify;
-    singleSphere = single_sphere;
+    simplify_ratio = doc["SimplifyRatio"].as<double>();
+    simplify_ratio = std::max(0.001, std::min(1., simplify_ratio)); //clamp to [0.001, 1]
 }
 
-SphereTreeURDFGenerator::~SphereTreeURDFGenerator(){
-    m_method.reset();
-    m_method = nullptr;
+SphereTreeURDFGenerator::~SphereTreeURDFGenerator() {
+
 }
 
 bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path, const std::string &output_path,
                                                    const std::vector<std::pair<std::string, std::string>> &replace_pairs) {
 
     auto ret = loadURDF(urdf_path, m_model);
-    if(!ret.IsOK()){
-        PLOGE<<ret.error_msg();
+    if (!ret.IsOK()) {
+        PLOGE << ret.error_msg();
         return ret;
     }
-    for (auto &link_pair: m_model->links_) {
-        if(link_pair.second->collision_array.size() > 1){
-            return {bot_common::ErrorCode::Error, "We only accept one collision mesh"};
-        }else{
-            auto& collision = link_pair.second->collision;
-            if(collision != nullptr){
-                switch (collision->geometry->type) {
-                    case urdf::Geometry::MESH: {
-                        auto *mesh = dynamic_cast<urdf::Mesh *>(collision->geometry.get());
-                        std::string filename_raw = mesh->filename;
-                        for(const auto& replace_pair : replace_pairs){
-                            replaceWith(filename_raw, replace_pair.first, replace_pair.second);
-                        }
-                        std::filesystem::path filename = filename_raw;
-                        Eigen::MatrixXd V;
-                        Eigen::MatrixXi F, N;
-                        bool alreadyOBJ = false;
-                        ret = loadedIntoIGL(filename, V, F, N, alreadyOBJ);
-                        if (!ret.IsOK()) {
-                            PLOGE << ret.error_msg();
-                            return ret;
-                        } else {
-                            Eigen::Vector3d centroid;
-                            if(doSimplify){
-                                Eigen::MatrixXd CH_V;
-                                Eigen::MatrixXi CH_F;
-                                Eigen::VectorXi J;
-                                igl::decimate(V, F, 0.3 * F.rows(), CH_V, CH_F, J);
-                                ret = saveCollisionGeometry(filename, CH_V, CH_F);
-                                centroid = CH_V.colwise().mean();
-                            }else if(!alreadyOBJ){
-                                ret = saveCollisionGeometry(filename, V, F);
-                                centroid = V.colwise().mean();
-                            }
+    std::cout << "Got " << m_model->links_.size() << " links to process" << std::endl;
+    //do deep copy
+    loadURDF(urdf_path, m_biggest_model);
 
+// Inside SphereTreeURDFGenerator::run
+    std::vector<std::future<bot_common::ErrorInfo>> futures;
+    int link_count = 0;
+    for (auto &link_pair: m_model->links_) {
+        futures.emplace_back(std::async(std::launch::async, [this, &link_pair, &replace_pairs, &link_count]() -> bot_common::ErrorInfo {
+            if (link_pair.second->collision_array.size() > 1) {
+                return {bot_common::ErrorCode::Error, "We only accept one collision mesh"};
+            } else {
+                auto &collision = link_pair.second->collision;
+                if (collision != nullptr) {
+                    switch (collision->geometry->type) {
+                        case urdf::Geometry::MESH: {
+                            auto *mesh = dynamic_cast<urdf::Mesh *>(collision->geometry.get());
+                            std::string filename_raw = mesh->filename;
+                            for (const auto &replace_pair: replace_pairs) {
+                                replaceWith(filename_raw, replace_pair.first, replace_pair.second);
+                            }
+                            std::filesystem::path filename = filename_raw;
+                            Eigen::MatrixXd V;
+                            MatrixD OUT_V;
+                            Eigen::MatrixXi F, N;
+                            MatrixI OUT_F;
+                            bool alreadyOBJ = false;
+                            auto ret = loadedIntoIGL(filename, V, F, N, alreadyOBJ);
                             if (!ret.IsOK()) {
                                 PLOGE << ret.error_msg();
                                 return ret;
-                            }else{
-                                SphereTreeMethod::MySphereTree tree;
-                                //todo: handle construct errors;
-                                m_method->constructTree(filename.string(), tree);
-                                if(singleSphere){
+                            } else {
+                                //do manifold watertight process
+                                std::cout << "-------------------Start Processing Watertight Manifold----------------"
+                                          << std::endl;
+                                auto m_manifold = std::make_unique<Manifold>();
+                                m_manifold->ProcessManifold(V, F, 8, &OUT_V, &OUT_F);
+                                std::cout << "Got " << OUT_F.rows() << " faces after watertight manifold processing"
+                                          << std::endl;
+                                std::cout << "-------------------End Processing Watertight Manifold----------------"
+                                          << std::endl;
+                                //compute volume;
+                                Eigen::VectorXd vol;
+                                Eigen::MatrixXi T(F.rows(), 4);
+                                // Assuming the mesh is already tetrahedralized, otherwise you need to tetrahedralize it
+                                // Here we just copy F to T for demonstration purposes
+                                T.leftCols(3) = OUT_F;
+                                T.col(3).setZero();
+                                igl::volume(OUT_V, T, vol);
+                                double total_volume = vol.sum();
+                                Eigen::Vector3d centroid;
+                                if (doSimplify) {
+                                    std::cout << "-------------------Start Simplify----------------" << std::endl;
+                                    Eigen::VectorXi J;
+                                    igl::decimate(OUT_V, OUT_F, static_cast<size_t>(simplify_ratio * (double) OUT_F.rows()), V, F, J);
+                                    std::cout << "Simplify from " << OUT_F.rows() << " to " << F.rows() << std::endl;
+                                    std::cout << "-------------------End Simplify----------------" << std::endl;
+                                } else {
+                                    V = OUT_V;
+                                    F = OUT_F;
+                                }
+
+                                for(unsigned i=0; i<3;++i){
+                                    centroid(i) = (V.col(i).maxCoeff() + V.col(i).minCoeff()) * 0.5;
+                                }
+
+                                if (!ret.IsOK()) {
+                                    PLOGE << ret.error_msg();
+                                    return ret;
+                                } else {
+                                    SphereTreeMethod::MySphereTree tree;
+                                    //todo: handle construct errors;
+                                    std::cout << "-------------------Start Sphere Tree Approximation for " << link_count++
+                                              << "-th link ----------------" << std::endl;
+                                    SphereTreeMethod::SphereTreeUniquePtr m_method;
+                                    switch (type_) {
+                                        case SphereTreeMethod::Grid:
+                                            m_method = SphereTreeMethod::SphereTreeMethodGrid::create(config_path_);
+                                        case SphereTreeMethod::Hubbard:
+                                            m_method = SphereTreeMethod::SphereTreeMethodHubbard::create(config_path_);
+                                        case SphereTreeMethod::Medial:
+                                            m_method = SphereTreeMethod::SphereTreeMethodMedial::create(config_path_);
+                                        case SphereTreeMethod::Octree:
+                                            m_method = SphereTreeMethod::SphereTreeMethodOctree::create(config_path_);
+                                        case SphereTreeMethod::Spawn:
+                                            m_method = SphereTreeMethod::SphereTreeMethodSpawn::create(config_path_);
+                                        default:
+                                            m_method = SphereTreeMethod::SphereTreeMethodMedial::create(config_path_);
+                                    }
+
+                                    m_method->constructTree(V, F, tree);
+
+                                    //do single sphere approximation
                                     auto sphere = std::make_shared<urdf::Sphere>();
                                     sphere->radius = tree.biggest_sphere.R();
-                                    collision->origin.position.x = centroid.x() + tree.biggest_sphere.X();
-                                    collision->origin.position.y = centroid.y() + tree.biggest_sphere.Y();
-                                    collision->origin.position.z = centroid.z() + tree.biggest_sphere.Z();
-                                    collision->origin.rotation.clear();
-                                    collision->geometry = sphere;
-                                }else{
+                                    //find the corresponding collision in biggest model
+                                    int i = std::find(link_pair.second->collision_array.begin(),
+                                                      link_pair.second->collision_array.end(), collision) -
+                                            link_pair.second->collision_array.begin();
+                                    auto biggest_collision = m_biggest_model->links_[link_pair.first]->collision_array[i];
+                                    biggest_collision->origin.position.x = centroid.x() + tree.biggest_sphere.X();
+                                    biggest_collision->origin.position.y = centroid.y() + tree.biggest_sphere.Y();
+                                    biggest_collision->origin.position.z = centroid.z() + tree.biggest_sphere.Z();
+                                    biggest_collision->origin.rotation.clear();
+                                    biggest_collision->geometry = sphere;
+
+                                    // do spheres approximation
                                     link_pair.second->collision_array.clear();
-                                    for(const SphereTreeMethod::Sphere& sub_sphere : tree.sub_spheres){
-                                        auto sphere_collision  = std::make_shared<urdf::Collision>();
+                                    for (const SphereTreeMethod::Sphere &sub_sphere: tree.sub_spheres) {
+                                        auto sphere_collision = std::make_shared<urdf::Collision>();
                                         sphere_collision->origin.position.x = centroid.x() + sub_sphere.X();
                                         sphere_collision->origin.position.y = centroid.y() + sub_sphere.Y();
                                         sphere_collision->origin.position.z = centroid.z() + sub_sphere.Z();
                                         sphere_collision->origin.rotation.clear();
-                                        auto sphere = std::make_shared<urdf::Sphere>();
-                                        sphere->radius = sub_sphere.R();
+                                        sphere = std::make_shared<urdf::Sphere>();
+                                        sphere->radius = std::abs(sub_sphere.R());
                                         sphere_collision->geometry = sphere;
-                                        link_pair.second->collision_array.emplace_back(sphere_collision);
+                                        if (sphere->radius > 0.005){
+                                            link_pair.second->collision_array.emplace_back(sphere_collision);
+                                        }
                                     }
                                     link_pair.second->collision = link_pair.second->collision_array[0];
+                                    std::cout << "-------------------End Sphere Tree Approximation----------------"
+                                              << std::endl;
                                 }
                             }
+                            break;
                         }
-                        break;
+                        default:
+                            break;
                     }
-                        //do nothing for simple geometry primitives
-                    default:
-                        break;
                 }
             }
+            return {bot_common::ErrorCode::OK, ""};
+        }));
+    }
+
+    for (auto &&future : futures) {
+        auto fut_ret = future.get();
+        if (!fut_ret.IsOK()) {
+            return fut_ret;
         }
     }
+    //change xxx.urdf to xxx_spherized.urdf
+    std::string biggest_output_path = output_path;
+    replaceWith(biggest_output_path, ".urdf", "_1.urdf");
+    writeURDF(biggest_output_path, m_biggest_model);
     return writeURDF(output_path, m_model);
 }

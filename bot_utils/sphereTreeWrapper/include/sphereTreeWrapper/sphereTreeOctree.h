@@ -47,7 +47,7 @@
 
 
 #include "sphereTreeBase.h"
-#include "alg_factory/algorithm_factory.h"
+#include "irmv/bot_common/alg_factory/algorithm_factory.h"
 
 namespace SphereTreeMethod {
     constexpr char SphereTreeMethodOctreeName[] = "SphereTreeOctreeName";
@@ -60,7 +60,7 @@ namespace SphereTreeMethod {
 
         static SphereTreeUniquePtr create(const std::string &config_path);
 
-        bot_common::ErrorInfo constructTree(const std::string &file, MySphereTree& tree) override;
+        bot_common::ErrorInfo constructTree(Surface &sur, MySphereTree& tree) override;
 
     protected:
         int depth = 3;              ///<  depth of the sphere-tree

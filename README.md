@@ -13,7 +13,7 @@ Notice: the following steps are adopted to generate a spherized version
 2. Simplify (Optional; using `igl:decimate` to down-sample surfaces into 30%)
 3. Spherized Version Generation(Several hyper-parameters can be tuned. See `config/sphereTree/sphereTreeConfig.yml`)
 
-​				<img src="./assets/origin.png" style="zoom:50%;" /> <img src="./assets/spherized.png" style="zoom:50%;" />
+​				<img src="./assets/origin2.png" style="zoom:70%;" /> <img src="./assets/spherized.png" style="zoom:70%;" />
 
 ## Convex
 
@@ -21,7 +21,7 @@ Specifically, the term `Convex` refers to convex hull approximated collision.
 
 Notice: `cgal::convex_hull()` are used.
 
-​				<img src="./assets/origin2.png" style="zoom:50%;" /><img src="./assets/convex.png" style="zoom:50%;" />
+​				<img src="./assets/origin.png" style="zoom:50%;" /><img src="./assets/convex.png" style="zoom:50%;" />
 
 ## URDF
 
@@ -41,6 +41,7 @@ This package relies on binary-distributed libraries:
 - [urdfdom](https://github.com/ros/urdfdom)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 - [tinyxml2](https://github.com/leethomason/tinyxml2)
+- gmp
 
 Fortunately, they can be installed through simple `apt-get` process.  
 
@@ -48,19 +49,42 @@ Fortunately, they can be installed through simple `apt-get` process.
 sudo apt-get install libcgal-dev liburdfdom-dev libyaml-cpp-dev libtinyxml2-dev libgmp-dev
 ```
 
-The distribution also contains the following sources from other people (some are introduced in a header-only manner):
+The distribution also contains the following sources from other people (all are introduced in a header-only manner):
 
 - [libigl](https://github.com/libigl/libigl)
-- [plog](https://github.com/SergiusTheBest/plog)
 - [sphere_tree](https://github.com/mlund/spheretree)
 - [ManifoldPlus](https://github.com/hjwdzh/ManifoldPlus)
 - [cmake-template](https://github.com/cpp-best-practices/cmake_template/tree/main)
 
 This work is built on the basis of those fantastic works. We thank all the aforementioned open-source project for the help of the implementations.
 
+This work also relies on self-maintained pkg `irmv_core`, users could obtain the newest version from the **release** page in this repo.
+One can install it with simply
+
+```shell
+cd ~ && git clone https://github.com/PREDICT-EPFL/piqp.git
+cd piqp
+mkdir build && cd build
+cmake .. -DCMAKE_CXX_FLAGS="-march=native" -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
+make -j8
+sudo make install
+cd ~ && rm -rf piqp
+
+cd ~ && git clone https://github.com/SergiusTheBest/plog.git
+cd plog && mkdir build
+cd build && cmake ..
+make && sudo make install
+cd ~ && sudo rm -rf ./plog
+
+sudo dpkg -i install irmv_core-xxx--Linux-Release-GNU-9.4.0.deb
+```
+
+One can simply remove it with `sudo dpkg -r irmv_core`.
+
 # Compile
 
 ```shell
+git submodule update --init --recursive
 cmake -B build . -DCMAKE_BUILD_TYPE=Release
 cmake --build build 
 ```
@@ -70,7 +94,7 @@ cmake --build build
 ## Spherized
 
 ```shell
-cd build && ./spherized -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...] [--single_sphere <0|1>] [--simplify <0|1>]
+cd build && ./spherized -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...] [--simplify <0|1>]
 ```
 
 - `-i <input_urdf_path>`: Specifies the path to the input URDF file.
@@ -81,14 +105,12 @@ cd build && ./spherized -i <input_urdf_path> -o <output_urdf_path> [-r <key> <va
 
   ​	**An useful replacement pair for ROS is “package:/” “/home/xxx/xxx_ws/src”. ** This will help this program to replace the original “package://yyy/mesh/zzz.stl” into “/home/xxx/xxx_ws/src/yyy/mesh/zzz.stl” to correctly find the mesh file without ROS. Meanwhile, the generated URDF will generate the mesh URL using the original format like “package:/yyy/mesh/zzz.obj”. So it can be directly valid for ROS
 
-- `--single_sphere <0|1>`: Indicates whether to generate a single sphere approximation of the URDF. Use `1` to enable and `0` to disable.
-
 - `--simplify <0|1>`: Indicates whether to simplify the URDF generation process. Use `1` to enable and `0` to disable.
 
 ## Convex
 
 ```shell
-cd build && ./convex -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...] [--single_sphere <0|1>] [--simplify <0|1>]
+cd build && ./convex -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...]
 ```
 
 - `-i <input_urdf_path>`: Specifies the path to the input URDF file.
@@ -99,7 +121,9 @@ cd build && ./convex -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value
 
   ​	**An useful replacement pair for ROS is “package:/” “/home/xxx/xxx_ws/src”. ** This will help this program to replace the original “package://yyy/mesh/zzz.stl” into “/home/xxx/xxx_ws/src/yyy/mesh/zzz.stl” to correctly find the mesh file without ROS. Meanwhile, the generated URDF will generate the mesh URL using the original format like “package:/yyy/mesh/zzz.obj”. So it can be directly valid for ROS.
 
+## Parameters Tuning
 
+​	See config files in `config/sphereTree/sphereTreeConfig.yml`
 
 ## Example
 
@@ -130,7 +154,7 @@ into
 ### Spherized
 
 ```shell
-cd build && ./sphereized -i /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf -o /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf -r "package:" "/home/zyx/path_ws/src" --single_sphere 0 --simplify 0
+cd build && ./sphereized -i /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf -o /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf -r "package:" "/home/zyx/path_ws/src" --simplify 1
 ```
 
 ### Convex

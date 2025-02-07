@@ -1,55 +1,48 @@
 # 0: grid 1: hubbard 2: medial 3: octree 4: spawn; default: 2
-Method: 2
-
+Method: 2  # Specifies the algorithm to use for sphere-tree construction. Default is 2 (medial).
 Grid:
-  TesterLevers: 2
-  Branch: 8
-  Depth: 1
-  NumCoverPts: 10000
-  MinCoverPts: 5
-  Verify: false
-  Nopause: false
-  Eval: false
-
-Hubbard:
-  Branch: 8
-  Depth: 1
-  NumSamples: 500
-  MinSamples: 1
-  Verify: false
-  Nopause: true
+  TesterLevers: 2  # Controls the number of points to use to represent a sphere when evaluating fit. Use -1 for CONVEX objects, 1 will generate 42 points, and 2 will generate 168 points.
+  Branch: 8  # Branching factor of the sphere-tree.
+  Depth: 1  # Depth of the sphere-tree.
+  NumCoverPts: 10000  # Number of sample points to cover the object with.
+  MinCoverPts: 5  # Minimum number of sample points per triangle.
+  Verify: false  # Verify the model is suitable for use.
+  Nopause: false  # Don't pause when processing, i.e., batch mode.
+  Eval: false  # Evaluate the fit of the sphere-tree and append the info to the end of the output file.
 
 Medial:
-  TesterLevers: 2
-  Branch: 8
-  Depth: 1
-  NumCoverPts: 20000
-  MinCoverPts: 5
-  InitSpheres: 1000
-  ErFact: 2
-  SpheresPerNode: 500
-  Verify: false
-  Nopause: true
-  Eval: false
-  UseMerge: true
-  UseBurst: false
-  UseExpand: true
-  Optimise: 0
-  BalExcess: 0.0
-  MaxOptLevel: 0
-
-Octree:
-  Depth: 1
-  Verify: false
-  Nopause: false
-  Eval: false
+  TesterLevers: 2  # Controls the number of points to use to represent a sphere when evaluating fit. Use -1 for CONVEX objects, 1 will generate 42 points, and 2 will generate 168 points.
+  Branch: 8  # Branching factor of the sphere-tree.
+  Depth: 1  # Depth of the sphere-tree.
+  NumCoverPts: 20000  # Number of sample points to cover the object with.
+  MinCoverPts: 5  # Minimum number of sample points per triangle.
+  InitSpheres: 1000  # Initial number of spheres in medial axis approximation.
+  ErFact: 2  # Amount by which to reduce the error when refining the medial axis approximation.
+  SpheresPerNode: 1000  # Minimum number of spheres to create for each sub-region of the medial axis approximation.
+  Verify: false  # Verify the model is suitable for use.
+  Nopause: true  # Don't pause when processing, i.e., batch mode.
+  Eval: false  # Evaluate the fit of the sphere-tree and append the info to the end of the output file.
+  UseMerge: true  # Use the MERGE algorithm.
+  UseBurst: false  # Use the BURST algorithm.
+  UseExpand: false  # Use the EXPAND algorithm.
+  Optimise: 1  # Which optimization algorithm to use. 0 for None, 1 for SIMPLEX, 2 for BALANCE.
+  BalExcess: 0.0  # The amount of extra error the BALANCE algorithm is allowed to introduce when throwing away error.
+  MaxOptLevel: 1  # Maximum level of the sphere-tree to apply the optimizer.
 
 Spawn:
-  TesterLevers: 2
-  Branch: 8
-  Depth: 1
-  NumCoverPts: 5000
-  MinCoverPts: 5
-  Verify: false
-  Nopause: false
-  Eval: false
+  TesterLevers: 2  # Controls the number of points to use to represent a sphere when evaluating fit. Use -1 for CONVEX objects, 1 will generate 42 points, and 2 will generate 168 points.
+  Branch: 8  # Branching factor of the sphere-tree.
+  Depth: 1  # Depth of the sphere-tree.
+  NumCoverPts: 5000  # Number of sample points to cover the object with.
+  MinCoverPts: 5  # Minimum number of sample points per triangle.
+  Verify: false  # Verify the model is suitable for use.
+  Nopause: false  # Don't pause when processing, i.e., batch mode.
+  Eval: false  # Evaluate the fit of the sphere-tree and append the info to the end of the output file.
+
+Octree:
+  Depth: 1  # Depth of the sphere-tree.
+  Verify: false  # Verify the model is suitable for use.
+  Nopause: false  # Don't pause when processing, i.e., batch mode.
+  Eval: false  # Evaluate the fit of the sphere-tree and append the info to the end of the output file.
+
+SimplifyRatio: 0.02  # The rate at which to simplify the sphere-tree. [0.001, 1]

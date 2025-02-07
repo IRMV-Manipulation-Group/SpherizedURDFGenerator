@@ -44,7 +44,7 @@
 
 #include "sphereTreeWrapper/sphereTreeMedial.h"
 #include "yaml-cpp/yaml.h"
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
 #include "Surface/Surface.h"
 #include "Surface/OBJLoader.h"
 #include "API/MSGrid.h"
@@ -107,189 +107,181 @@ namespace SphereTreeMethod {
     }
 
     SphereTreeUniquePtr SphereTreeMethodMedial::create(const std::string &config_path) {
-        return bot_common::AlgorithmFactory<SphereTreeMethodBase,  const std::string &>::CreateAlgorithm(
+        return bot_common::AlgorithmFactory<SphereTreeMethodBase, const std::string &>::CreateAlgorithm(
                 SphereTreeMethodMedialName, config_path);
     }
 
-    bot_common::ErrorInfo SphereTreeMethodMedial::constructTree(const std::string &file, MySphereTree& tree) {
-        if (file.size() > 4 && file.substr(file.size() - 4) == ".obj") {
-            Surface sur;
-            bool loaded = loadOBJ(&sur, file.c_str());
-            if (!loaded) {
-                return {bot_common::ErrorCode::Error, file + " cannot be loaded"};
-            }
-            float boxScale = sur.fitIntoBox(1000);
-            MedialTester mt;
-            mt.setSurface(sur);
-            mt.useLargeCover = true;
+    bot_common::ErrorInfo SphereTreeMethodMedial::constructTree(Surface &sur, MySphereTree &tree) {
+        float boxScale = sur.fitIntoBox(1000);
+        MedialTester mt;
+        mt.setSurface(sur);
+        mt.useLargeCover = true;
 
-            SEConvex convEval;
-            convEval.setTester(mt);
-            SEBase *eval_ = &convEval;
+        SEConvex convEval;
+        convEval.setTester(mt);
+        SEBase *eval_ = &convEval;
 
-            Array<Point3D> sphPts;
-            SESphPt sphEval;
+        Array<Point3D> sphPts;
+        SESphPt sphEval;
 
-            //  <= 0 will use convex tester
-            if (testerLevels > 0) {
-                SSIsohedron::generateSamples(&sphPts, testerLevels - 1);
-                sphEval.setup(mt, sphPts);
-                eval_ = &sphEval;
-                PLOGI << "Using concave tester " << sphPts.getSize();
-            }
+        //  <= 0 will use convex tester
+        if (testerLevels > 0) {
+            SSIsohedron::generateSamples(&sphPts, testerLevels - 1);
+            sphEval.setup(mt, sphPts);
+            eval_ = &sphEval;
+            PLOGI << "Using concave tester " << sphPts.getSize();
+        }
 
-            /*
-                verify model
-            */
-            if (verify && !verifyModel(sur)) {
-                return {bot_common::ErrorCode::Error, "model is not usable"};
-            }
+        /*
+            verify model
+        */
+        if (verify && !verifyModel(sur)) {
+            return {bot_common::ErrorCode::Error, "model is not usable"};
+        }
 
-            /*
-            setup for the set of cover points
-            */
-            Array<Surface::Point> coverPts;
-            MSGrid::generateSamples(&coverPts, numCoverPts, sur, TRUE, minCoverPts);
-            PLOGD<< coverPts.getSize() << "cover points";
+        /*
+        setup for the set of cover points
+        */
+        Array<Surface::Point> coverPts;
+        MSGrid::generateSamples(&coverPts, numCoverPts, sur, TRUE, minCoverPts);
+        PLOGD << coverPts.getSize() << "cover points";
 
-            /*
-               Setup voronoi diagram
-            */
-            Point3D pC{};
-            pC.x = (sur.pMax.x + sur.pMin.x) / 2.0;
-            pC.y = (sur.pMax.y + sur.pMin.y) / 2.0;
-            pC.z = (sur.pMax.z + sur.pMin.z) / 2.0;
+        /*
+           Setup voronoi diagram
+        */
+        Point3D pC {};
+        pC.x = (sur.pMax.x + sur.pMin.x) / 2.0;
+        pC.y = (sur.pMax.y + sur.pMin.y) / 2.0;
+        pC.z = (sur.pMax.z + sur.pMin.z) / 2.0;
 
-            Voronoi3D vor;
-            vor.initialise(pC, 1.5 * sur.pMin.distance(pC));
+        Voronoi3D vor;
+        vor.initialise(pC, 1.5 * sur.pMin.distance(pC));
 
-            /*
-                setup adaptive Voronoi algorithm
-            */
-            VFAdaptive adaptive;
-            adaptive.mt = &mt;
-            adaptive.eval = eval_;
+        /*
+            setup adaptive Voronoi algorithm
+        */
+        VFAdaptive adaptive;
+        adaptive.mt = &mt;
+        adaptive.eval = eval_;
 
-            /*
-                setup FITTER
-            */
-            SFWhite fitter;
+        /*
+            setup FITTER
+        */
+        SFWhite fitter;
 
-            /*
-                setup MERGE
-            */
-            SRMerge merger;
-            merger.sphereEval = eval_;
-            merger.sphereFitter = &fitter;
-            merger.useBeneficial = true;
-            merger.doAllBelow = branch * 3; // DO_ALL_BELOW = branch * 3
-            merger.setup(&vor, &mt);
-            merger.vorAdapt = &adaptive;
-            merger.initSpheres = initSpheres;
-            merger.errorDecreaseFactor = erFact;
-            merger.minSpheresPerNode = spheresPerNode;
-            merger.maxItersForVoronoi = static_cast<int>(1.50 * spheresPerNode);
+        /*
+            setup MERGE
+        */
+        SRMerge merger;
+        merger.sphereEval = eval_;
+        merger.sphereFitter = &fitter;
+        merger.useBeneficial = true;
+        merger.doAllBelow = branch * 3; // DO_ALL_BELOW = branch * 3
+        merger.setup(&vor, &mt);
+        merger.vorAdapt = &adaptive;
+        merger.initSpheres = initSpheres;
+        merger.errorDecreaseFactor = erFact;
+        merger.minSpheresPerNode = spheresPerNode;
+        merger.maxItersForVoronoi = static_cast<int>(1.50 * spheresPerNode);
 
-            /*
-                setup BURST
-            */
-            SRBurst burster;
-            burster.sphereEval = eval_;
-            burster.sphereFitter = &fitter;
-            burster.useBeneficial = true;
-            burster.doAllBelow = branch * 3;
-            burster.setup(&vor, &mt);
+        /*
+            setup BURST
+        */
+        SRBurst burster;
+        burster.sphereEval = eval_;
+        burster.sphereFitter = &fitter;
+        burster.useBeneficial = true;
+        burster.doAllBelow = branch * 3;
+        burster.setup(&vor, &mt);
 
-            if (!useBurst) {
-                //  setup adaptive algorithm
-                burster.vorAdapt = &adaptive;
-                burster.initSpheres = initSpheres;
-                burster.errorDecreaseFactor = erFact;
-                burster.minSpheresPerNode = spheresPerNode;
-                burster.maxItersForVoronoi = static_cast<int>(1.50 * spheresPerNode);
-            } else {
-                // leave adaptive algorithm out as merge will do it for us
-                burster.vorAdapt = nullptr;
-            }
+        if (!useBurst) {
+            //  setup adaptive algorithm
+            burster.vorAdapt = &adaptive;
+            burster.initSpheres = initSpheres;
+            burster.errorDecreaseFactor = erFact;
+            burster.minSpheresPerNode = spheresPerNode;
+            burster.maxItersForVoronoi = static_cast<int>(1.50 * spheresPerNode);
+        } else {
+            // leave adaptive algorithm out as merge will do it for us
+            burster.vorAdapt = nullptr;
+        }
 
-            /*
-                setup EXPAND generator
-            */
-            REMaxElim elimME;
-            SRExpand expander;
-            expander.redElim = &elimME;
-            expander.setup(&vor, &mt);
-            expander.errStep = 100;
-            expander.useIterativeSelect = false;
-            expander.relTol = static_cast<float>(1E-5);
-            if (!useMerge && !useBurst) {
-                //  setup adaptive algorithm
-                expander.vorAdapt = &adaptive;
-                expander.initSpheres = initSpheres;
-                expander.errorDecreaseFactor = erFact;
-                expander.minSpheresPerNode = spheresPerNode;
-                expander.maxItersForVoronoi = static_cast<int>(1.50 * spheresPerNode);
-            } else {
-                // leave adaptive algorithm out as previous algs will do it for us
-                expander.vorAdapt = nullptr;
-            }
+        /*
+            setup EXPAND generator
+        */
+        REMaxElim elimME;
+        SRExpand expander;
+        expander.redElim = &elimME;
+        expander.setup(&vor, &mt);
+        expander.errStep = 100;
+        expander.useIterativeSelect = false;
+        expander.relTol = static_cast<float>(1E-5);
+        if (!useMerge && !useBurst) {
+            //  setup adaptive algorithm
+            expander.vorAdapt = &adaptive;
+            expander.initSpheres = initSpheres;
+            expander.errorDecreaseFactor = erFact;
+            expander.minSpheresPerNode = spheresPerNode;
+            expander.maxItersForVoronoi = static_cast<int>(1.50 * spheresPerNode);
+        } else {
+            // leave adaptive algorithm out as previous algs will do it for us
+            expander.vorAdapt = nullptr;
+        }
 
-            /*
-                setup the COMPOSITE algorithm
-            */
-            SRComposite composite;
-            composite.eval = eval_;
-            if (useMerge)
-                composite.addReducer(&merger);
-            if (useBurst)
-                composite.addReducer(&burster);
-            if (useExpand)
-                composite.addReducer(&expander);
+        /*
+            setup the COMPOSITE algorithm
+        */
+        SRComposite composite;
+        composite.eval = eval_;
+        if (useMerge)
+            composite.addReducer(&merger);
+        if (useBurst)
+            composite.addReducer(&burster);
+        if (useExpand)
+            composite.addReducer(&expander);
 
-            /*
-                setup simplex optimiser in case we want it
-            */
-            SOSimplex simOpt;
-            simOpt.sphereEval = eval_;
-            simOpt.sphereFitter = &fitter;
+        /*
+            setup simplex optimiser in case we want it
+        */
+        SOSimplex simOpt;
+        simOpt.sphereEval = eval_;
+        simOpt.sphereFitter = &fitter;
 
-            /*
-                setup balance optimiser to throw away spheres as long as
-                increase in error is less than balExcess e.g. 0.05 is 1.05%
-            */
-            SOBalance balOpt;
-            balOpt.sphereEval = eval_;
-            balOpt.optimiser = &simOpt;
-            balOpt.V = 0.0f;
-            balOpt.A = 1;
-            balOpt.B = balExcess;
+        /*
+            setup balance optimiser to throw away spheres as long as
+            increase in error is less than balExcess e.g. 0.05 is 1.05%
+        */
+        SOBalance balOpt;
+        balOpt.sphereEval = eval_;
+        balOpt.optimiser = &simOpt;
+        balOpt.V = 0.0f;
+        balOpt.A = 1;
+        balOpt.B = balExcess;
 
-            /*
-                setup SphereTree constructor - using dynamic construction
-            */
-            STGGeneric treegen;
-            treegen.eval = eval_;
-            treegen.useRefit = true;
-            treegen.setSamples(coverPts);
-            treegen.reducer = &composite;
-            treegen.maxOptLevel = maxOptLevel;
-            if (optimise == SIMPLEX)
-                treegen.optimiser = &simOpt;
-            else if (optimise == BALANCE)
-                treegen.optimiser = &balOpt;
+        /*
+            setup SphereTree constructor - using dynamic construction
+        */
+        STGGeneric treegen;
+        treegen.eval = eval_;
+        treegen.useRefit = true;
+        treegen.setSamples(coverPts);
+        treegen.reducer = &composite;
+        treegen.maxOptLevel = maxOptLevel;
+        if (optimise == SIMPLEX)
+            treegen.optimiser = &simOpt;
+        else if (optimise == BALANCE)
+            treegen.optimiser = &balOpt;
 
-            /*
-                make sphere-tree
-            */
-            SphereTree m_tree;
-            m_tree.setupTree(branch, depth + 1);
+        /*
+            make sphere-tree
+        */
+        SphereTree m_tree;
+        m_tree.setupTree(branch, depth + 1);
 
-            treegen.constructTree(&m_tree);
-            tree.setBySphereTree(m_tree, 1.0 / boxScale);
-            return bot_common::ErrorInfo::OK();
-        } else
-            return {bot_common::ErrorCode::Error, file + "is invalid file. Only OBJ file is supported"};
+        treegen.constructTree(&m_tree);
+        tree.setBySphereTree(m_tree, 1.0 / boxScale);
+        return bot_common::ErrorInfo::OK();
     }
 
-    
+
 }

@@ -137,3 +137,109 @@ function(is_verbose var)
         PARENT_SCOPE)
   endif()
 endfunction()
+
+# Function to format dependencies with "lib" prefix and version requirements
+function(prepare_debian_dependencies dependencies output_var)
+  # Check if the input dependencies list is empty
+  if ("${dependencies}" STREQUAL "")
+    set(${output_var} "" PARENT_SCOPE)
+    return()
+  endif()
+
+  set(result "")
+
+  foreach(dep ${dependencies})
+    string(REPLACE " " ";" dep_parts ${dep})  # Split name and version
+    list(GET dep_parts 0 PKG_NAME)
+    list(GET dep_parts 1 PKG_VERSION)
+
+    # Add "lib" prefix, format with version
+    set(formatted_dep "${PKG_NAME} (>= ${PKG_VERSION})")
+
+    # Append to result list
+    if(result)
+      set(result "${result}, ${formatted_dep}")
+    else()
+      set(result "${formatted_dep}")
+    endif()
+  endforeach()
+
+  # Output to specified variable
+  set(${output_var} "${result}" PARENT_SCOPE)
+endfunction()
+
+function(prepare_irmv_dependencies dependencies output_var)
+  # Check if the input dependencies list is empty
+  if ("${dependencies}" STREQUAL "")
+    set(${output_var} "" PARENT_SCOPE)
+    return()
+  endif()
+
+  set(result "")
+
+  foreach(dep ${dependencies})
+    string(REPLACE " " ";" dep_parts ${dep})  # Split name and version
+    list(GET dep_parts 0 PKG_NAME)
+    list(GET dep_parts 1 PKG_VERSION)
+    set(formatted_dep "${PKG_NAME} (>= ${PKG_VERSION})")
+
+    find_package(${PKG_NAME} ${PKG_VERSION} QUIET)
+    get_property(GLOBAL_${PKG_NAME}_LIBRARIES GLOBAL PROPERTY ${PKG_NAME}_LIBRARIES)
+    if (NOT ${PKG_NAME}_FOUND AND "${GLOBAL_${PKG_NAME}_LIBRARIES}" STREQUAL "")
+      message(WARNING "Please install ${PKG_NAME} ${PKG_VERSION} first, try to include source code")
+      add_subdirectory(${PKG_NAME})
+      set(${PKG_NAME}_LIBRARIES ${PKG_NAME} PARENT_SCOPE)
+      set(${PKG_NAME}_INCLUDE_DIRS "${${PKG_NAME}_INCLUDE_DIRS}" PARENT_SCOPE)
+
+      set_property(GLOBAL PROPERTY ${PKG_NAME}_LIBRARIES ${PKG_NAME})
+      set_property(GLOBAL PROPERTY ${PKG_NAME}_INCLUDE_DIRS "${${PKG_NAME}_INCLUDE_DIRS}")
+    elseif (${PKG_NAME}_FOUND)
+      set(${PKG_NAME}_LIBRARIES ${PKG_NAME}::${PKG_NAME} PARENT_SCOPE)
+    endif ()
+    # Add "lib" prefix, format with version
+    set(formatted_dep "${PKG_NAME} (>= ${PKG_VERSION})")
+
+    # Append to result list
+    if(result)
+      set(result "${result}, ${formatted_dep}")
+    else()
+      set(result "${formatted_dep}")
+    endif()
+  endforeach()
+
+  # Output to specified variable
+  set(${output_var} "${result}" PARENT_SCOPE)
+endfunction()
+
+function(add_gtest_discover_for_file test_file)
+  # Parse optional LINK_LIBRARIES argument to accept multiple libraries
+  cmake_parse_arguments(ARG "" "" "LINK_LIBRARIES" ${ARGN})
+
+  # Extract the filename without extension to use as the test target name
+  get_filename_component(test_name ${test_file} NAME_WE)
+
+  # Create an executable for the test
+  add_executable(${test_name} ${test_file})
+
+  # Link the executable to GTest, pthread, and any additional libraries
+  target_link_libraries(${test_name} PRIVATE GTest::GTest GTest::Main pthread ${ARG_LINK_LIBRARIES})
+
+  # Add the test to the test suite
+  gtest_discover_tests(${test_name})
+endfunction()
+
+
+function(add_benchmark_discover_for_file bench_file)
+  # Parse optional LINK_LIBRARIES argument to accept multiple libraries
+  cmake_parse_arguments(ARG "" "" "LINK_LIBRARIES" ${ARGN})
+
+  # Extract the filename without extension to use as the test target name
+  get_filename_component(bench_name ${bench_file} NAME_WE)
+
+  # Create an executable for the test
+  add_executable(${bench_name} ${bench_file})
+
+  # Link the executable to GTest, pthread, and any additional libraries
+  target_link_libraries(${bench_name} PRIVATE benchmark::benchmark pthread ${ARG_LINK_LIBRARIES})
+
+endfunction()

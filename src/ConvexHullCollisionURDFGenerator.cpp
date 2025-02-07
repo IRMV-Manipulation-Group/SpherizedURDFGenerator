@@ -50,7 +50,7 @@
 #include <igl/copyleft/cgal/convex_hull.h>
 #include <igl/moments.h>
 
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
 
 ConvexHullCollisionURDFGenerator::ConvexHullCollisionURDFGenerator() : URDFGenerator() {
     m_model = std::make_shared<urdf::ModelInterface>();

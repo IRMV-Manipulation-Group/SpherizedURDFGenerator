@@ -1,5 +1,4 @@
-# Enable doxygen doc builds of source
-function(myproject_enable_doxygen DOXYGEN_THEME)
+function(myproject_enable_doxygen DOXYGEN_THEME DOXYGEN_EXCLUDE_DIRS)
   # If not specified, use the top readme file as the first page
   if((NOT DOXYGEN_USE_MDFILE_AS_MAINPAGE) AND EXISTS "${PROJECT_SOURCE_DIR}/README.md")
     set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${PROJECT_SOURCE_DIR}/README.md")
@@ -18,10 +17,29 @@ function(myproject_enable_doxygen DOXYGEN_THEME)
   set(DOXYGEN_DOT_IMAGE_FORMAT svg)
   set(DOXYGEN_DOT_TRANSPARENT YES)
 
-  # If not specified, exclude the vcpkg files and the files CMake downloads under _deps (like project_options)
+  # If not specified, exclude the vcpkg files and files CMake downloads under _deps
+  # Append external exclude directories
   if(NOT DOXYGEN_EXCLUDE_PATTERNS)
-    set(DOXYGEN_EXCLUDE_PATTERNS "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/*" "${CMAKE_CURRENT_BINARY_DIR}/_deps/*")
+    set(DOXYGEN_EXCLUDE_PATTERNS
+            "${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/*"
+            "${CMAKE_CURRENT_BINARY_DIR}/_deps/*"
+    )
   endif()
+
+  # Add user-specified exclusion directories
+  foreach(path IN LISTS DOXYGEN_EXCLUDE_DIRS)
+    if(IS_DIRECTORY ${path})
+      list(APPEND DOXYGEN_EXCLUDE_PATTERNS "${path}/*")
+      message(STATUS "Excluding path '${path}' from doxygen.")
+    elseif(EXISTS ${path})
+      list(APPEND DOXYGEN_EXCLUDE_PATTERNS "${path}")
+      message(STATUS "Excluding path '${path}' from doxygen.")
+    else()
+      message(STATUS "Path '${path}' does not exist and will be ignored.")
+    endif()
+  endforeach()
+
+  set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc")
 
   if("${DOXYGEN_THEME}" STREQUAL "")
     set(DOXYGEN_THEME "awesome-sidebar")
@@ -31,14 +49,14 @@ function(myproject_enable_doxygen DOXYGEN_THEME)
     # use a modern doxygen theme
     # https://github.com/jothepro/doxygen-awesome-css v1.6.1
     FetchContent_Declare(_doxygen_theme
-                         URL https://github.com/jothepro/doxygen-awesome-css/archive/refs/tags/v1.6.1.zip)
+            URL https://github.com/jothepro/doxygen-awesome-css/archive/refs/tags/v1.6.1.zip)
     FetchContent_MakeAvailable(_doxygen_theme)
     if("${DOXYGEN_THEME}" STREQUAL "awesome" OR "${DOXYGEN_THEME}" STREQUAL "awesome-sidebar")
       set(DOXYGEN_HTML_EXTRA_STYLESHEET "${_doxygen_theme_SOURCE_DIR}/doxygen-awesome.css")
     endif()
     if("${DOXYGEN_THEME}" STREQUAL "awesome-sidebar")
       set(DOXYGEN_HTML_EXTRA_STYLESHEET ${DOXYGEN_HTML_EXTRA_STYLESHEET}
-                                        "${_doxygen_theme_SOURCE_DIR}/doxygen-awesome-sidebar-only.css")
+              "${_doxygen_theme_SOURCE_DIR}/doxygen-awesome-sidebar-only.css")
     endif()
   else()
     # use the original doxygen theme
@@ -50,5 +68,5 @@ function(myproject_enable_doxygen DOXYGEN_THEME)
   # add doxygen-docs target
   message(STATUS "Adding `doxygen-docs` target that builds the documentation.")
   doxygen_add_docs(doxygen-docs ALL ${PROJECT_SOURCE_DIR}
-                   COMMENT "Generating documentation - entry file: ${CMAKE_CURRENT_BINARY_DIR}/html/index.html")
+          COMMENT "Generating documentation - entry file: ${CMAKE_CURRENT_BINARY_DIR}/html/index.html")
 endfunction()

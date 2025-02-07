@@ -91,8 +91,8 @@ public:
 
 
 protected:
-    std::string resourcePath = RESOURCE_PATH;
-    std::string configPath = CONFIG_PATH;
+    std::string resourcePath =  SpherizedURDFGenerator_RESOURCE_PATH;
+    std::string configPath = SpherizedURDFGenerator_CONFIG_PATH;
     SphereTreeMethod::SphereTreeUniquePtr m_method;
 };
 

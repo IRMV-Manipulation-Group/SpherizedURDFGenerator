@@ -47,7 +47,7 @@
 
 
 #include "sphereTreeBase.h"
-#include "alg_factory/algorithm_factory.h"
+#include "irmv/bot_common/alg_factory/algorithm_factory.h"
 
 namespace SphereTreeMethod {
     constexpr char SphereTreeMethodMedialName[] = "SphereTreeMedialName";
@@ -60,11 +60,10 @@ namespace SphereTreeMethod {
 
         static SphereTreeUniquePtr create(const std::string &config_path);
 
-        bot_common::ErrorInfo constructTree(const std::string &file, MySphereTree& tree) override;
+        bot_common::ErrorInfo constructTree(Surface &sur, MySphereTree& tree) override;
 
     protected:
         int testerLevels = -1;      ///<  number of levels for NON-CONVEX, -1 uses CONVEX tester
-        int branch = 8;             ///<  branching factor of the sphere-tree
         int depth = 3;              ///<  depth of the sphere-tree
         int numCoverPts = 5000;     ///<  number of test points to put on surface for coverage
         int minCoverPts = 5;        ///<  minimum number of points per triangle for coverage

@@ -46,7 +46,7 @@
 #include <urdf_parser/urdf_parser.h>
 #include <tinyxml2.h>
 #include "URDFGenerator.h"
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
 #include <fstream>
 #include <igl/readSTL.h>
 #include <igl/readOBJ.h>
@@ -142,8 +142,18 @@ void createGeometryElement(tinyxml2::XMLDocument &doc, tinyxml2::XMLElement *par
     parent->InsertEndChild(geometry_elem);
 }
 
-// Function to create an inertia element with scientific notation
 void createInertiaElement(tinyxml2::XMLDocument &doc, tinyxml2::XMLElement *parent, const urdf::Inertial &inertial) {
+    tinyxml2::XMLElement *inertial_elem = doc.NewElement("inertial");
+
+    // Add origin element
+    createOriginElement(doc, inertial_elem, inertial.origin);
+
+    // Add mass element
+    tinyxml2::XMLElement *mass_elem = doc.NewElement("mass");
+    mass_elem->SetAttribute("value", std::to_string(inertial.mass).c_str());
+    inertial_elem->InsertEndChild(mass_elem);
+
+    // Add inertia element
     tinyxml2::XMLElement *inertia_elem = doc.NewElement("inertia");
     std::stringstream ss;
     ss << std::scientific << std::setprecision(6);
@@ -170,15 +180,9 @@ void createInertiaElement(tinyxml2::XMLDocument &doc, tinyxml2::XMLElement *pare
     ss.clear();
     ss << inertial.izz;
     inertia_elem->SetAttribute("izz", ss.str().c_str());
-    parent->InsertEndChild(inertia_elem);
+    inertial_elem->InsertEndChild(inertia_elem);
 
-    // Add mass element
-    tinyxml2::XMLElement *mass_elem = doc.NewElement("mass");
-    mass_elem->SetAttribute("value", std::to_string(inertial.mass).c_str());
-    parent->InsertEndChild(mass_elem);
-
-    // Add origin element
-    createOriginElement(doc, parent, inertial.origin);
+    parent->InsertEndChild(inertial_elem);
 }
 
 // Handler for visual or collision elements
@@ -357,12 +361,9 @@ URDFGenerator::writeURDF(const std::string &file_path, const urdf::ModelInterfac
         // Add dynamics element if applicable
         if (joint->dynamics) {
             tinyxml2::XMLElement *dynamics_elem = doc.NewElement("dynamics");
-            if (joint->dynamics->damping != 0) {
-                dynamics_elem->SetAttribute("damping", std::to_string(joint->dynamics->damping).c_str());
-            }
-            if (joint->dynamics->friction != 0) {
-                dynamics_elem->SetAttribute("friction", std::to_string(joint->dynamics->friction).c_str());
-            }
+            dynamics_elem->SetAttribute("damping", std::to_string(joint->dynamics->damping).c_str());
+            dynamics_elem->SetAttribute("friction", std::to_string(joint->dynamics->friction).c_str());
+
             joint_elem->InsertEndChild(dynamics_elem);
         }
 

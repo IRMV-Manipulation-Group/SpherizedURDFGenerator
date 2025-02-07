@@ -45,7 +45,7 @@
 
 #include "sphereTreeWrapper/sphereTreeOctree.h"
 #include "yaml-cpp/yaml.h"
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
 #include "Surface/Surface.h"
 #include "Surface/OBJLoader.h"
 #include "API/STGOctree.h"
@@ -79,29 +79,21 @@ namespace SphereTreeMethod {
                 SphereTreeMethodOctreeName, config_path);
     }
 
-    bot_common::ErrorInfo SphereTreeMethodOctree::constructTree(const std::string &file, MySphereTree &tree) {
-        if (file.size() > 4 && file.substr(file.size() - 4) == ".obj") {
-            Surface sur;
-            bool loaded = loadOBJ(&sur, file.c_str());
-            if (!loaded) {
-                return {bot_common::ErrorCode::Error, file + " cannot be loaded"};
-            }
-            /*
+    bot_common::ErrorInfo SphereTreeMethodOctree::constructTree(Surface & sur, MySphereTree &tree) {
+        /*
                 scale box
             */
-            float boxScale = sur.fitIntoBox(1000);
+        float boxScale = sur.fitIntoBox(1000);
 
 
 
-            STGOctree treegen;
-            treegen.setSurface(sur);
-            SphereTree m_tree;
-            m_tree.setupTree(8, depth+1);
+        STGOctree treegen;
+        treegen.setSurface(sur);
+        SphereTree m_tree;
+        m_tree.setupTree(8, depth+1);
 
-            treegen.constructTree(&m_tree);
-            tree.setBySphereTree(m_tree, 1.0 / boxScale);
-            return bot_common::ErrorInfo::OK();
-        } else
-            return {bot_common::ErrorCode::Error, file + "is invalid file. Only OBJ file is supported"};
+        treegen.constructTree(&m_tree);
+        tree.setBySphereTree(m_tree, 1.0 / boxScale);
+        return bot_common::ErrorInfo::OK();
     }
 }

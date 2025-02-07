@@ -114,7 +114,7 @@ protected:
     MatrixD V, out_V;
     MatrixI F, out_F;
     Eigen::MatrixXd N;
-    std::string resourcePath = RESOURCE_PATH;
+    std::string resourcePath = SpherizedURDFGenerator_RESOURCE_PATH;
 };
 
 TEST_F(ManifoldTest, STLTest) {

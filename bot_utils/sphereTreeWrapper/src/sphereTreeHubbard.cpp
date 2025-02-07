@@ -44,7 +44,7 @@
 
 #include "sphereTreeWrapper/sphereTreeHubbard.h"
 #include "yaml-cpp/yaml.h"
-#include "log/log.h"
+#include "irmv/bot_common/log/log.h"
 #include "Surface/Surface.h"
 #include "Surface/OBJLoader.h"
 #include "MedialAxis/Voronoi3D.h"
@@ -85,73 +85,65 @@ namespace SphereTreeMethod {
                 SphereTreeMethodHubbardName, config_path);
     }
 
-    bot_common::ErrorInfo SphereTreeMethodHubbard::constructTree(const std::string &file, MySphereTree &tree) {
-        if (file.size() > 4 && file.substr(file.size() - 4) == ".obj") {
-            Surface sur;
-            bool loaded = loadOBJ(&sur, file.c_str());
-            if (!loaded) {
-                return {bot_common::ErrorCode::Error, file + " cannot be loaded"};
-            }
-            /*
+    bot_common::ErrorInfo SphereTreeMethodHubbard::constructTree(Surface& sur, MySphereTree &tree) {
+        /*
                 scale box
             */
-            float boxScale = sur.fitIntoBox(1000);
+        float boxScale = sur.fitIntoBox(1000);
 
-            /*
-                make medial tester
-            */
-            MedialTester mt;
-            mt.setSurface(sur);
-            mt.useLargeCover = true;
+        /*
+            make medial tester
+        */
+        MedialTester mt;
+        mt.setSurface(sur);
+        mt.useLargeCover = true;
 
 
-            /*
-                verify model
-            */
-            if (verify && !verifyModel(sur)) {
-                return {bot_common::ErrorCode::Error, "model is not usable"};
-            }
+        /*
+            verify model
+        */
+        if (verify && !verifyModel(sur)) {
+            return {bot_common::ErrorCode::Error, "model is not usable"};
+        }
 
-            /*
-                generate the set of sample points
-            */
-            Array<Surface::Point> samplePts;
-            MSGrid::generateSamples(&samplePts, numSamples, sur, TRUE, minSamples);
-            PLOGD<<"sample points: "<<samplePts.getSize();
+        /*
+            generate the set of sample points
+        */
+        Array<Surface::Point> samplePts;
+        MSGrid::generateSamples(&samplePts, numSamples, sur, TRUE, minSamples);
+        PLOGD << "sample points: " << samplePts.getSize();
 
-            //  SurfaceRep coverRep;
-            //  coverRep.setup(coverPts);
+        //  SurfaceRep coverRep;
+        //  coverRep.setup(coverPts);
 
-            /*
-               Setup voronoi diagram
-            */
-            Point3D pC{};
-            pC.x = (sur.pMax.x + sur.pMin.x) / 2.0;
-            pC.y = (sur.pMax.y + sur.pMin.y) / 2.0;
-            pC.z = (sur.pMax.z + sur.pMin.z) / 2.0;
+        /*
+           Setup voronoi diagram
+        */
+        Point3D pC {};
+        pC.x = (sur.pMax.x + sur.pMin.x) / 2.0;
+        pC.y = (sur.pMax.y + sur.pMin.y) / 2.0;
+        pC.z = (sur.pMax.z + sur.pMin.z) / 2.0;
 
-            Voronoi3D vor;
-            vor.initialise(pC, 1.5 * sur.pMin.distance(pC));
-            vor.randomInserts(samplePts);
+        Voronoi3D vor;
+        vor.initialise(pC, 1.5 * sur.pMin.distance(pC));
+        vor.randomInserts(samplePts);
 
-            /*
-                setup HUBBARD's algorithm
-            */
-            STGHubbard hubbard;
-            hubbard.setup(&vor, &mt);
+        /*
+            setup HUBBARD's algorithm
+        */
+        STGHubbard hubbard;
+        hubbard.setup(&vor, &mt);
 
-            /*
-                make sphere-tree
-            */
-            SphereTree m_tree;
-            m_tree.setupTree(branch, depth+1);
+        /*
+            make sphere-tree
+        */
+        SphereTree m_tree;
+        m_tree.setupTree(branch, depth + 1);
 
-            hubbard.constructTree(&m_tree);
-            m_tree.setupTree(branch, depth + 1);
-            tree.setBySphereTree(m_tree, 1.0 / boxScale);
+        hubbard.constructTree(&m_tree);
+        m_tree.setupTree(branch, depth + 1);
+        tree.setBySphereTree(m_tree, 1.0 / boxScale);
 
-            return bot_common::ErrorInfo::OK();
-        } else
-            return {bot_common::ErrorCode::Error, file + "is invalid file. Only OBJ file is supported"};
+        return bot_common::ErrorInfo::OK();
     }
 }

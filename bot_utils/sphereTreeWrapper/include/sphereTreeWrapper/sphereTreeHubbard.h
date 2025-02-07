@@ -47,7 +47,7 @@
 
 
 #include "sphereTreeBase.h"
-#include "alg_factory/algorithm_factory.h"
+#include "irmv/bot_common/alg_factory/algorithm_factory.h"
 
 namespace SphereTreeMethod {
     constexpr char SphereTreeMethodHubbardName[] = "SphereTreeHubbardName";
@@ -60,10 +60,9 @@ namespace SphereTreeMethod {
 
         static SphereTreeUniquePtr create(const std::string &config_path);
 
-        bot_common::ErrorInfo constructTree(const std::string &file, MySphereTree& tree) override;
+        bot_common::ErrorInfo constructTree(Surface &sur, MySphereTree& tree) override;
 
     protected:
-        int branch = 8;             ///<  branching factor of the sphere-tree
         int depth = 3;              ///<  depth of the sphere-tree
         int numSamples = 500;       //  number of samples to put on surface for static medial
         int minSamples = 1;         //  minimum number of points per triangle for static medial

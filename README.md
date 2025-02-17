@@ -94,7 +94,7 @@ cmake --build build
 ## Spherized
 
 ```shell
-cd build && ./spherized -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...] [--simplify <0|1>]
+cd build/app && ./spherized -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...] [--simplify <0|1>]
 ```
 
 - `-i <input_urdf_path>`: Specifies the path to the input URDF file.
@@ -110,7 +110,7 @@ cd build && ./spherized -i <input_urdf_path> -o <output_urdf_path> [-r <key> <va
 ## Convex
 
 ```shell
-cd build && ./convex -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...]
+cd build/app && ./convex -i <input_urdf_path> -o <output_urdf_path> [-r <key> <value> ...]
 ```
 
 - `-i <input_urdf_path>`: Specifies the path to the input URDF file.

@@ -165,14 +165,19 @@ bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path,
                                     switch (type_) {
                                         case SphereTreeMethod::Grid:
                                             m_method = SphereTreeMethod::SphereTreeMethodGrid::create(config_path_);
+                                            break;
                                         case SphereTreeMethod::Hubbard:
                                             m_method = SphereTreeMethod::SphereTreeMethodHubbard::create(config_path_);
+                                            break;
                                         case SphereTreeMethod::Medial:
                                             m_method = SphereTreeMethod::SphereTreeMethodMedial::create(config_path_);
+                                            break;
                                         case SphereTreeMethod::Octree:
                                             m_method = SphereTreeMethod::SphereTreeMethodOctree::create(config_path_);
+                                            break;
                                         case SphereTreeMethod::Spawn:
                                             m_method = SphereTreeMethod::SphereTreeMethodSpawn::create(config_path_);
+                                            break;
                                         default:
                                             m_method = SphereTreeMethod::SphereTreeMethodMedial::create(config_path_);
                                     }
@@ -249,6 +254,7 @@ bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path,
     json_file.close();
     //change xxx.urdf to xxx_spherized.urdf
     std::string biggest_output_path = output_path;
+    //replace with new name
     replaceWith(biggest_output_path, ".urdf", "_1.urdf");
     writeURDF(biggest_output_path, m_biggest_model);
 

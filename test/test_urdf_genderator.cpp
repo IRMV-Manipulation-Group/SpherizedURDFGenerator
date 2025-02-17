@@ -78,9 +78,9 @@ TEST_F(URDFGeneratorTest, CVXTest) {
 }
 
 TEST_F(URDFGeneratorTest, STTest) {
-    auto ret = spherized_generator->run("/home/irmv/project/ningde_ws/src/simulation/rm_dcr_description/urdf/robot_raw.urdf",
-                          "/home/irmv/project/ningde_ws/src/simulation/rm_dcr_description/urdf/robot_spherized.urdf",{
-                                             {"package:/", "/home/irmv/project/ningde_ws/src/simulation"}
+    auto ret = spherized_generator->run("/home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf",
+                          "/home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf",{
+                                             {"package:/", "/home/zyx/path_ws/src"}
                                      });
 
     std::cout<<ret.error_msg()<<std::endl;

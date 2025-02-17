@@ -55,9 +55,11 @@
 #include <string>
 #include <igl/decimate.h>
 #include "irmv/bot_common/log/log.h"
+#include "irmv/third_party/json.hpp"
 #include "ManifoldPlus/Manifold.h"
 #include <future>
 #include <igl/volume.h>
+#include <fstream>
 
 SphereTreeURDFGenerator::SphereTreeURDFGenerator(const std::string &st_config_path, bool simplify) {
     YAML::Node doc = YAML::LoadFile(st_config_path);
@@ -87,12 +89,17 @@ bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path,
 // Inside SphereTreeURDFGenerator::run
     std::vector<std::future<bot_common::ErrorInfo>> futures;
     int link_count = 0;
+    //json
+    nlohmann::json json;
     for (auto &link_pair: m_model->links_) {
-        futures.emplace_back(std::async(std::launch::async, [this, &link_pair, &replace_pairs, &link_count]() -> bot_common::ErrorInfo {
+        json[link_pair.first] = nlohmann::json();
+        auto& link_json = json[link_pair.first];
+        futures.emplace_back(std::async(std::launch::async, [this, &link_pair, &replace_pairs, &link_count, &link_json]() -> bot_common::ErrorInfo {
             if (link_pair.second->collision_array.size() > 1) {
                 return {bot_common::ErrorCode::Error, "We only accept one collision mesh"};
             } else {
                 auto &collision = link_pair.second->collision;
+
                 if (collision != nullptr) {
                     switch (collision->geometry->type) {
                         case urdf::Geometry::MESH: {
@@ -185,9 +192,16 @@ bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path,
                                     biggest_collision->origin.position.z = centroid.z() + tree.biggest_sphere.Z();
                                     biggest_collision->origin.rotation.clear();
                                     biggest_collision->geometry = sphere;
+                                    link_json["BiggestSphere"] = std::vector<double>{biggest_collision->origin.position.x,
+                                                                              biggest_collision->origin.position.y,
+                                                                              biggest_collision->origin.position.z,
+                                                                              tree.biggest_sphere.R()};
 
                                     // do spheres approximation
                                     link_pair.second->collision_array.clear();
+                                    link_json["SubSpheres"] = nlohmann::json();
+                                    auto& spheres_json = link_json["SubSpheres"];
+                                    int counter = 0;
                                     for (const SphereTreeMethod::Sphere &sub_sphere: tree.sub_spheres) {
                                         auto sphere_collision = std::make_shared<urdf::Collision>();
                                         sphere_collision->origin.position.x = centroid.x() + sub_sphere.X();
@@ -198,6 +212,10 @@ bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path,
                                         sphere->radius = std::abs(sub_sphere.R());
                                         sphere_collision->geometry = sphere;
                                         if (sphere->radius > 0.005){
+                                            spheres_json[("r" + std::to_string(i++))] = std::vector<double>{sphere_collision->origin.position.x,
+                                                                                                      sphere_collision->origin.position.y,
+                                                                                                      sphere_collision->origin.position.z,
+                                                                                                      sphere->radius};
                                             link_pair.second->collision_array.emplace_back(sphere_collision);
                                         }
                                     }
@@ -223,9 +241,16 @@ bot_common::ErrorInfo SphereTreeURDFGenerator::run(const std::string &urdf_path,
             return fut_ret;
         }
     }
+    //write to json file.
+    std::string json_output_path = output_path;
+    replaceWith(json_output_path, ".urdf", ".json");
+    std::ofstream json_file(json_output_path);
+    json_file << json.dump(4);
+    json_file.close();
     //change xxx.urdf to xxx_spherized.urdf
     std::string biggest_output_path = output_path;
     replaceWith(biggest_output_path, ".urdf", "_1.urdf");
     writeURDF(biggest_output_path, m_biggest_model);
+
     return writeURDF(output_path, m_model);
 }

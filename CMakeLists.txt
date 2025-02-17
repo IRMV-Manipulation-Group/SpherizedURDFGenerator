@@ -7,7 +7,7 @@ set(CMAKE_C_STANDARD 99)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(PROJECT_VERSION 1.2.0)
+set(PROJECT_VERSION 1.3)
 set(PROJECT_SO_VERSION 1)
 
 # Set the author and email

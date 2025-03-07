@@ -21,7 +21,7 @@ Specifically, the term `Convex` refers to convex hull approximated collision.
 
 Notice: `cgal::convex_hull()` are used.
 
-​				<img src="./assets/origin.png" style="zoom:50%;" /><img src="./assets/convex.png" style="zoom:50%;" />
+​				<img src="./assets/origin.png" style="zoom:25%;" /><img src="./assets/convex.png" style="zoom:25%;" />
 
 ## URDF
 
@@ -125,6 +125,27 @@ cd build/app && ./convex -i <input_urdf_path> -o <output_urdf_path> [-r <key> <v
 
 ​	See config files in `config/sphereTree/sphereTreeConfig.yml`
 
+### Outputs
+
+ 1. One URDF whose collision elements contain several spheres, and has name `xxx_spherized.urdf`
+
+ 2. One URDF whose collision elements only contain the biggest sphere, and has name `xxx_spherized_1.urdf` 
+
+ 3. One JSON File contains spheres description with the format as 
+
+    ```json
+    {
+        "link_name":{
+            "BiggesetSphere":[x, y, z, radius],
+            "SubSpheres":{
+                "r0":[x, y, z, radius],
+                ........
+            }
+        }
+        ...........
+    }
+    ```
+
 ## Example
 
 We use [franka](https://github.com/justagist/franka_panda_description) to test.
@@ -154,13 +175,13 @@ into
 ### Spherized
 
 ```shell
-cd build && ./sphereized -i /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf -o /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf -r "package:" "/home/zyx/path_ws/src" --simplify 1
+cd build/app && ./sphereized -i /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf -o /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf -r "package:" "/home/zyx/path_ws/src" --simplify 1
 ```
 
 ### Convex
 
 ```shell
-cd build && ./convex -i /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf -o /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf -r "package:" "/home/zyx/path_ws/src"
+cd build/app && ./convex -i /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm.urdf -o /home/zyx/path_ws/src/franka_panda_description/robots/panda_arm_spherized.urdf -r "package:" "/home/zyx/path_ws/src"
 ```
 
 # Citation
